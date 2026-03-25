@@ -320,6 +320,8 @@ export class PromptGuard {
     console.log('Enabled checks:', this.config.enabledChecks.join(', '));
     console.log('Auto-inject:', this.config.autoInject);
     console.log('Confirm before send:', this.config.confirmBeforeSend);
+    console.log('Max context tokens:', this.config.maxContextTokens);
+    console.log('Model limits:', Object.keys(this.config.modelLimits).join(', '));
   }
 
   // Helper methods

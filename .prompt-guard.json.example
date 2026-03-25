@@ -1,0 +1,14 @@
+{
+  "contextFiles": ["PROJECT.md", "CONTEXT.md", "README.md"],
+  "enabledChecks": ["files-mentioned", "tests-mentioned", "success-criteria", "constraints", "local-env", "context-window"],
+  "autoInject": true,
+  "confirmBeforeSend": true,
+  "maxContextTokens": 4000,
+  "modelLimits": {
+    "claude": 100000,
+    "claude-opus": 200000,
+    "gpt-4": 8000,
+    "gpt-4-turbo": 128000,
+    "cursor": 8000
+  }
+}
