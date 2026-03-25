@@ -11,6 +11,7 @@ async function main() {
     console.log('Commands:');
     console.log('  check <prompt>     Check a prompt for missing context');
     console.log('  enhance <prompt>   Enhance prompt with context from .md files');
+    console.log('  relevance <prompt> Show context relevance scoring');
     console.log('  config             Show current configuration');
     console.log('  init               Initialize prompt-guard in current project');
     console.log('');
@@ -33,6 +34,12 @@ async function main() {
     case 'enhance':
       const enhanced = await guard.enhance(promptText);
       console.log(enhanced);
+      break;
+    case 'relevance':
+      const { SmartRelevance } = require('../dist/smart-relevance');
+      const relevance = new SmartRelevance(guard);
+      const report = await relevance.generateRelevanceReport(promptText);
+      console.log(report);
       break;
     case 'config':
       guard.showConfig();
