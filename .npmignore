@@ -15,6 +15,12 @@ tests/
 # Examples (keep but not essential)
 examples/
 
+# VS Code extension (separate package)
+vscode-extension/
+
+# Cursor integration (docs only)
+cursor-integration/
+
 # Context files from development
 PROJECT.md
 CONTEXT.md
