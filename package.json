@@ -1,5 +1,5 @@
 {
-  "name": "prompt-guard",
+  "name": "prompt-guard-cli",
   "version": "0.1.0",
   "description": "Context-aware prompt enhancement for AI coding agents",
   "main": "dist/index.js",

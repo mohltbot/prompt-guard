@@ -16,8 +16,8 @@ async function main() {
     console.log('  init               Initialize prompt-guard in current project');
     console.log('');
     console.log('Examples:');
-    console.log('  prompt-guard check "refactor auth system"');
-    console.log('  prompt-guard enhance "add user login" --agent claude');
+    console.log('  prompt-guard-cli check "refactor auth system"');
+    console.log('  prompt-guard-cli enhance "add user login" --agent claude');
     process.exit(0);
   }
 

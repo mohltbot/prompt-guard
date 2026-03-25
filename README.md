@@ -49,7 +49,7 @@ refactor the auth system
 ## Installation
 
 ```bash
-npm install -g prompt-guard
+npm install -g prompt-guard-cli
 ```
 
 ## Quick Start
@@ -58,7 +58,7 @@ npm install -g prompt-guard
 
 ```bash
 cd your-project
-prompt-guard init
+prompt-guard-cli init
 ```
 
 This creates:
@@ -72,7 +72,7 @@ Fill in `PROJECT.md` and `CONTEXT.md` with your project details.
 ### 3. Check your prompts
 
 ```bash
-prompt-guard check "add user login"
+prompt-guard-cli check "add user login"
 ```
 
 Output:
@@ -90,15 +90,15 @@ Output:
 ### 4. Enhance and send
 
 ```bash
-prompt-guard enhance "add user login" | claude
+prompt-guard-cli enhance "add user login" | claude
 ```
 
 ## Commands
 
-- `prompt-guard init` — Create context files in current project
-- `prompt-guard check <prompt>` — Check for missing context
-- `prompt-guard enhance <prompt>` — Enhance with context
-- `prompt-guard config` — Show current configuration
+- `prompt-guard-cli init` — Create context files in current project
+- `prompt-guard-cli check <prompt>` — Check for missing context
+- `prompt-guard-cli enhance <prompt>` — Enhance with context
+- `prompt-guard-cli config` — Show current configuration
 
 ## Shell Integration
 
@@ -106,15 +106,15 @@ Add to your `.zshrc` or `.bashrc`:
 
 ```bash
 # Auto-enhance all claude commands
-alias claude='prompt-guard enhance'
+alias claude='prompt-guard-cli enhance'
 
 # Or check before sending
 claude() {
-  prompt-guard check "$*"
+  prompt-guard-cli check "$*"
   read -q "REPLY?Continue? [y/N] "
   echo
   if [[ $REPLY == "y" ]]; then
-    command claude "$(prompt-guard enhance "$*")"
+    command claude "$(prompt-guard-cli enhance "$*")"
   fi
 }
 ```
