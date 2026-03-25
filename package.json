@@ -4,7 +4,7 @@
   "description": "Context-aware prompt enhancement for AI coding agents",
   "main": "dist/index.js",
   "bin": {
-    "prompt-guard": "./bin/prompt-guard"
+    "prompt-guard": "bin/prompt-guard"
   },
   "scripts": {
     "build": "tsc",

@@ -176,7 +176,16 @@ AI: Extends existing Redis setup, adds cache layer to DB queries
 
 ## Roadmap
 
+**Current (v0.1.0):**
 - [x] CLI tool with check/enhance commands
+- [x] Context file loading (PROJECT.md, CONTEXT.md, etc.)
+- [x] Config file support (.prompt-guard.json)
+- [x] Local environment sanitization
+- [x] Context window protection with auto-truncation
+- [x] Token estimation
+- [x] 6 built-in checks (files, tests, criteria, constraints, local-env, context-window)
+
+**Coming Soon:**
 - [ ] VS Code extension
 - [ ] Cursor/Copilot integration
 - [ ] Smart context relevance scoring

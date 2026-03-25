@@ -1,0 +1,38 @@
+# Source files (only publish dist)
+src/
+tsconfig.json
+jest.config.js
+
+# Tests
+tests/
+*.test.ts
+*.spec.ts
+
+# Development files
+.gitignore
+.npmignore
+
+# Examples (keep but not essential)
+examples/
+
+# Context files from development
+PROJECT.md
+CONTEXT.md
+
+# Git
+.git/
+
+# CI/CD
+.github/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
