@@ -28,10 +28,13 @@ export class PromptGuard {
   private config: Config;
   private contextCache: Map<string, string> = new Map();
 
-  constructor(config?: Partial<Config>) {
+  constructor(config?: Partial<Config>, projectPath: string = process.cwd()) {
+    // Load config from .prompt-guard.json if it exists
+    const fileConfig = this.loadFileConfig(projectPath);
+    
     this.config = {
       contextFiles: ['PROJECT.md', 'SOUL.md', 'AGENTS.md', 'CONTEXT.md', 'README.md'],
-      enabledChecks: ['files-mentioned', 'tests-mentioned', 'success-criteria', 'constraints'],
+      enabledChecks: ['files-mentioned', 'tests-mentioned', 'success-criteria', 'constraints', 'local-env', 'context-window'],
       autoInject: true,
       confirmBeforeSend: true,
       maxContextTokens: 4000, // Default: leave room for response
@@ -42,8 +45,27 @@ export class PromptGuard {
         'gpt-4-turbo': 128000,
         'cursor': 8000
       },
+      ...fileConfig,
       ...config
     };
+  }
+
+  /**
+   * Load configuration from .prompt-guard.json file
+   */
+  private loadFileConfig(projectPath: string): Partial<Config> {
+    const configPath = path.join(projectPath, '.prompt-guard.json');
+    
+    if (fs.existsSync(configPath)) {
+      try {
+        const content = fs.readFileSync(configPath, 'utf-8');
+        return JSON.parse(content);
+      } catch (e) {
+        console.warn(chalk.yellow('⚠ Failed to parse .prompt-guard.json, using defaults'));
+      }
+    }
+    
+    return {};
   }
 
   /**
