@@ -1,0 +1,103 @@
+{
+  "name": "prompt-guard-vscode",
+  "displayName": "Prompt Guard",
+  "description": "Context-aware prompt enhancement for AI coding agents",
+  "version": "0.1.0",
+  "publisher": "mohltbot",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other",
+    "Machine Learning",
+    "Debuggers"
+  ],
+  "keywords": [
+    "ai",
+    "prompt",
+    "claude",
+    "cursor",
+    "context",
+    "llm"
+  ],
+  "activationEvents": [
+    "onCommand:promptGuard.check",
+    "onLanguage:markdown",
+    "onLanguage:typescript",
+    "onLanguage:javascript"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "promptGuard.check",
+        "title": "Check Prompt",
+        "category": "Prompt Guard"
+      },
+      {
+        "command": "promptGuard.checkSelection",
+        "title": "Check Selected Text",
+        "category": "Prompt Guard"
+      },
+      {
+        "command": "promptGuard.enhance",
+        "title": "Enhance Prompt",
+        "category": "Prompt Guard"
+      },
+      {
+        "command": "promptGuard.showOutput",
+        "title": "Show Output Panel",
+        "category": "Prompt Guard"
+      }
+    ],
+    "configuration": {
+      "title": "Prompt Guard",
+      "properties": {
+        "promptGuard.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Prompt Guard"
+        },
+        "promptGuard.checkOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Check prompts automatically on file save"
+        },
+        "promptGuard.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show status bar button"
+        }
+      }
+    },
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "promptGuard.check",
+          "when": "editorHasSelection"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "promptGuard.checkSelection",
+          "when": "editorHasSelection",
+          "group": "9_cutcopypaste@5"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "16.x",
+    "typescript": "^4.9.4"
+  },
+  "dependencies": {
+    "prompt-guard": "file:.."
+  }
+}
