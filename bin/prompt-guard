@@ -1,0 +1,49 @@
+#!/usr/bin/env node
+
+const { PromptGuard } = require('../dist/index');
+
+async function main() {
+  const args = process.argv.slice(2);
+  
+  if (args.length === 0) {
+    console.log('Usage: prompt-guard <command> [options]');
+    console.log('');
+    console.log('Commands:');
+    console.log('  check <prompt>     Check a prompt for missing context');
+    console.log('  enhance <prompt>   Enhance prompt with context from .md files');
+    console.log('  config             Show current configuration');
+    console.log('  init               Initialize prompt-guard in current project');
+    console.log('');
+    console.log('Examples:');
+    console.log('  prompt-guard check "refactor auth system"');
+    console.log('  prompt-guard enhance "add user login" --agent claude');
+    process.exit(0);
+  }
+
+  const [command, ...rest] = args;
+  const promptText = rest.join(' ');
+  
+  const guard = new PromptGuard();
+  
+  switch (command) {
+    case 'check':
+      const results = await guard.check(promptText);
+      guard.displayResults(results);
+      break;
+    case 'enhance':
+      const enhanced = await guard.enhance(promptText);
+      console.log(enhanced);
+      break;
+    case 'config':
+      guard.showConfig();
+      break;
+    case 'init':
+      await guard.init();
+      break;
+    default:
+      console.error(`Unknown command: ${command}`);
+      process.exit(1);
+  }
+}
+
+main().catch(console.error);

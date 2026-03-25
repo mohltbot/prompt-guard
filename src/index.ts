@@ -1,0 +1,325 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import { glob } from 'glob';
+import chalk from 'chalk';
+
+interface ContextFile {
+  name: string;
+  content: string;
+  relevance: number;
+}
+
+interface CheckResult {
+  type: 'warning' | 'error' | 'info';
+  message: string;
+  suggestion?: string;
+}
+
+interface Config {
+  contextFiles: string[];
+  enabledChecks: string[];
+  autoInject: boolean;
+  confirmBeforeSend: boolean;
+}
+
+export class PromptGuard {
+  private config: Config;
+  private contextCache: Map<string, string> = new Map();
+
+  constructor(config?: Partial<Config>) {
+    this.config = {
+      contextFiles: ['PROJECT.md', 'SOUL.md', 'AGENTS.md', 'CONTEXT.md', 'README.md'],
+      enabledChecks: ['files-mentioned', 'tests-mentioned', 'success-criteria', 'constraints'],
+      autoInject: true,
+      confirmBeforeSend: true,
+      ...config
+    };
+  }
+
+  /**
+   * Load context from .md files in project root
+   */
+  async loadContext(projectPath: string = process.cwd()): Promise<ContextFile[]> {
+    const contextFiles: ContextFile[] = [];
+    
+    for (const fileName of this.config.contextFiles) {
+      const filePath = path.join(projectPath, fileName);
+      
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        this.contextCache.set(fileName, content);
+        
+        contextFiles.push({
+          name: fileName,
+          content: this.truncateContent(content, 2000),
+          relevance: this.calculateRelevance(fileName)
+        });
+      }
+    }
+    
+    return contextFiles;
+  }
+
+  /**
+   * Check a prompt for missing context
+   */
+  async check(promptText: string): Promise<CheckResult[]> {
+    const results: CheckResult[] = [];
+    
+    // Check 1: Files mentioned
+    if (!this.hasFileReferences(promptText)) {
+      results.push({
+        type: 'warning',
+        message: 'No specific files mentioned',
+        suggestion: 'Add file paths like "src/auth/**" or "update login.js"'
+      });
+    }
+    
+    // Check 2: Tests mentioned
+    if (!this.hasTestReferences(promptText)) {
+      results.push({
+        type: 'warning',
+        message: 'No tests or validation criteria mentioned',
+        suggestion: 'Add "include tests" or "should handle X cases"'
+      });
+    }
+    
+    // Check 3: Success criteria
+    if (!this.hasSuccessCriteria(promptText)) {
+      results.push({
+        type: 'warning',
+        message: 'No clear success criteria',
+        suggestion: 'Add "should pass all tests" or "must handle 10k req/s"'
+      });
+    }
+    
+    // Check 4: Constraints
+    if (!this.hasConstraints(promptText)) {
+      results.push({
+        type: 'info',
+        message: 'No constraints mentioned',
+        suggestion: 'Consider adding "don\'t break existing API" or "keep under 100 lines"'
+      });
+    }
+    
+    return results;
+  }
+
+  /**
+   * Enhance prompt with context from .md files
+   */
+  async enhance(promptText: string): Promise<string> {
+    const contextFiles = await this.loadContext();
+    
+    if (contextFiles.length === 0) {
+      console.log(chalk.yellow('No context files found. Run `prompt-guard init` to create them.'));
+      return promptText;
+    }
+    
+    let enhancedPrompt = '';
+    
+    // Add context header
+    enhancedPrompt += `## Project Context\n\n`;
+    
+    for (const file of contextFiles) {
+      enhancedPrompt += `### From ${file.name}:\n${file.content}\n\n`;
+    }
+    
+    // Add the original prompt
+    enhancedPrompt += `## User Request\n\n${promptText}\n\n`;
+    
+    // Add instructions for the AI
+    enhancedPrompt += `## Instructions\n\n`;
+    enhancedPrompt += `- Consider the project context above\n`;
+    enhancedPrompt += `- Follow any patterns or conventions mentioned\n`;
+    enhancedPrompt += `- If tests are mentioned in context, include them\n`;
+    enhancedPrompt += `- Respect any constraints from the context files\n`;
+    
+    return enhancedPrompt;
+  }
+
+  /**
+   * Display check results with formatting
+   */
+  displayResults(results: CheckResult[]): void {
+    if (results.length === 0) {
+      console.log(chalk.green('✓ All checks passed!'));
+      return;
+    }
+    
+    console.log(chalk.bold('\nPrompt Analysis:\n'));
+    
+    for (const result of results) {
+      const icon = result.type === 'error' ? '✗' : result.type === 'warning' ? '⚠' : 'ℹ';
+      const color = result.type === 'error' ? chalk.red : result.type === 'warning' ? chalk.yellow : chalk.blue;
+      
+      console.log(color(`${icon} ${result.message}`));
+      if (result.suggestion) {
+        console.log(chalk.gray(`  → ${result.suggestion}`));
+      }
+    }
+    
+    console.log('');
+  }
+
+  /**
+   * Initialize prompt-guard in current project
+   */
+  async init(): Promise<void> {
+    const projectPath = process.cwd();
+    
+    console.log(chalk.bold('Initializing prompt-guard...\n'));
+    
+    // Create PROJECT.md template
+    const projectMdPath = path.join(projectPath, 'PROJECT.md');
+    if (!fs.existsSync(projectMdPath)) {
+      fs.writeFileSync(projectMdPath, this.getProjectTemplate());
+      console.log(chalk.green('✓ Created PROJECT.md'));
+    } else {
+      console.log(chalk.yellow('⚠ PROJECT.md already exists'));
+    }
+    
+    // Create CONTEXT.md template
+    const contextMdPath = path.join(projectPath, 'CONTEXT.md');
+    if (!fs.existsSync(contextMdPath)) {
+      fs.writeFileSync(contextMdPath, this.getContextTemplate());
+      console.log(chalk.green('✓ Created CONTEXT.md'));
+    } else {
+      console.log(chalk.yellow('⚠ CONTEXT.md already exists'));
+    }
+    
+    console.log(chalk.bold('\nNext steps:'));
+    console.log('1. Edit PROJECT.md with your project details');
+    console.log('2. Edit CONTEXT.md with coding conventions');
+    console.log('3. Run `prompt-guard check "your prompt"` to test');
+  }
+
+  /**
+   * Show current configuration
+   */
+  showConfig(): void {
+    console.log(chalk.bold('Prompt Guard Configuration:\n'));
+    console.log('Context files:', this.config.contextFiles.join(', '));
+    console.log('Enabled checks:', this.config.enabledChecks.join(', '));
+    console.log('Auto-inject:', this.config.autoInject);
+    console.log('Confirm before send:', this.config.confirmBeforeSend);
+  }
+
+  // Helper methods
+  private hasFileReferences(prompt: string): boolean {
+    const filePatterns = [
+      /\b\w+\.(js|ts|jsx|tsx|py|go|rs|java|cpp|c|h)\b/,
+      /\b(src|lib|app|components|utils|tests?)\/[\w\/]+/,
+      /\*\.[\w]+/,  // *.js, *.ts, etc.
+      /\b(file|files|path|paths)\b/i
+    ];
+    return filePatterns.some(pattern => pattern.test(prompt));
+  }
+
+  private hasTestReferences(prompt: string): boolean {
+    const testPatterns = [
+      /\btest(s)?\b/i,
+      /\bspec\b/i,
+      /\bvalidation\b/i,
+      /\bverify\b/i,
+      /\bshould\s+\w+/i,
+      /\bmust\s+\w+/i
+    ];
+    return testPatterns.some(pattern => pattern.test(prompt));
+  }
+
+  private hasSuccessCriteria(prompt: string): boolean {
+    const criteriaPatterns = [
+      /\b(should|must|needs? to)\s+\w+/i,
+      /\bgoal\b/i,
+      /\bsuccess\b/i,
+      /\bcriteria\b/i,
+      /\bhandle\s+\d+/i,
+      /\bpass\b/i
+    ];
+    return criteriaPatterns.some(pattern => pattern.test(prompt));
+  }
+
+  private hasConstraints(prompt: string): boolean {
+    const constraintPatterns = [
+      /\b(don't|do not|never)\s+\w+/i,
+      /\bavoid\b/i,
+      /\blimit\b/i,
+      /\bmax\b/i,
+      /\bconstraint\b/i,
+      /\bwithout\s+breaking\b/i
+    ];
+    return constraintPatterns.some(pattern => pattern.test(prompt));
+  }
+
+  private calculateRelevance(fileName: string): number {
+    const relevanceMap: Record<string, number> = {
+      'PROJECT.md': 1.0,
+      'CONTEXT.md': 0.9,
+      'AGENTS.md': 0.8,
+      'SOUL.md': 0.7,
+      'README.md': 0.6
+    };
+    return relevanceMap[fileName] || 0.5;
+  }
+
+  private truncateContent(content: string, maxLength: number): string {
+    if (content.length <= maxLength) return content;
+    return content.substring(0, maxLength) + '\n... (truncated)';
+  }
+
+  private getProjectTemplate(): string {
+    return `# Project Context
+
+## Overview
+Brief description of what this project does.
+
+## Tech Stack
+- Language: 
+- Framework: 
+- Database: 
+- Key Dependencies: 
+
+## Architecture
+- Main entry point: 
+- Core modules: 
+- Testing framework: 
+
+## Coding Conventions
+- Style guide: 
+- Naming conventions: 
+- File organization: 
+
+## Constraints
+- Performance requirements: 
+- Compatibility requirements: 
+- Security considerations: 
+`;
+  }
+
+  private getContextTemplate(): string {
+    return `# Coding Context
+
+## Patterns to Follow
+- Always write tests for new features
+- Use TypeScript strict mode
+- Prefer functional components
+- Keep functions under 50 lines
+
+## Things to Avoid
+- Don't use any types
+- Don't skip error handling
+- Don't break existing APIs without versioning
+
+## Testing Requirements
+- Unit tests for utilities
+- Integration tests for APIs
+- E2E tests for critical paths
+
+## Performance Targets
+- Page load under 2 seconds
+- API response under 200ms
+- Bundle size under 100KB
+`;
+  }
+}
