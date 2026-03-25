@@ -20,6 +20,8 @@ interface Config {
   enabledChecks: string[];
   autoInject: boolean;
   confirmBeforeSend: boolean;
+  maxContextTokens: number; // Approximate token limit for context
+  modelLimits: Record<string, number>; // Model-specific limits
 }
 
 export class PromptGuard {
@@ -32,6 +34,14 @@ export class PromptGuard {
       enabledChecks: ['files-mentioned', 'tests-mentioned', 'success-criteria', 'constraints'],
       autoInject: true,
       confirmBeforeSend: true,
+      maxContextTokens: 4000, // Default: leave room for response
+      modelLimits: {
+        'claude': 100000,
+        'claude-opus': 200000,
+        'gpt-4': 8000,
+        'gpt-4-turbo': 128000,
+        'cursor': 8000
+      },
       ...config
     };
   }
@@ -152,39 +162,96 @@ export class PromptGuard {
       });
     }
 
+    // Check 6: Context window size
+    const estimatedTokens = this.estimateTokens(promptText);
+    const contextFiles = await this.loadContext();
+    const contextTokens = contextFiles.reduce((sum, f) => sum + this.estimateTokens(f.content), 0);
+    const totalTokens = estimatedTokens + contextTokens;
+
+    if (totalTokens > this.config.maxContextTokens) {
+      results.push({
+        type: 'error',
+        message: `Context window will be exceeded (~${totalTokens} tokens)`,
+        suggestion: `Reduce context files or truncate content. Current: ${contextFiles.length} files, ${contextTokens} tokens of context. Try removing less relevant .md files.`
+      });
+    } else if (totalTokens > this.config.maxContextTokens * 0.8) {
+      results.push({
+        type: 'warning',
+        message: `Approaching context limit (~${totalTokens} tokens)`,
+        suggestion: 'Consider truncating context files or removing less relevant ones. Leave room for AI response.'
+      });
+    }
+
     return results;
   }
 
   /**
    * Enhance prompt with context from .md files
+   * Respects context window limits
    */
   async enhance(promptText: string): Promise<string> {
-    const contextFiles = await this.loadContext();
-    
+    let contextFiles = await this.loadContext();
+
     if (contextFiles.length === 0) {
       console.log(chalk.yellow('No context files found. Run `prompt-guard init` to create them.'));
       return promptText;
     }
-    
+
+    // Check context window and truncate if needed
+    const promptTokens = this.estimateTokens(promptText);
+    const instructionsTokens = 100; // Approximate
+    let availableTokens = this.config.maxContextTokens - promptTokens - instructionsTokens;
+
+    // Sort by relevance and truncate if needed
+    contextFiles.sort((a, b) => b.relevance - a.relevance);
+
+    let totalContextTokens = 0;
+    const includedFiles: ContextFile[] = [];
+
+    for (const file of contextFiles) {
+      const fileTokens = this.estimateTokens(file.content);
+
+      if (totalContextTokens + fileTokens <= availableTokens) {
+        includedFiles.push(file);
+        totalContextTokens += fileTokens;
+      } else {
+        // Try to truncate this file to fit
+        const remainingTokens = availableTokens - totalContextTokens;
+        if (remainingTokens > 500) { // Only include if we can fit meaningful content
+          const truncatedContent = this.truncateContent(file.content, remainingTokens * 4);
+          includedFiles.push({
+            ...file,
+            content: truncatedContent + '\n... (truncated due to context limit)'
+          });
+          totalContextTokens += remainingTokens;
+        }
+        break;
+      }
+    }
+
+    if (includedFiles.length < contextFiles.length) {
+      console.log(chalk.yellow(`⚠ Context truncated: using ${includedFiles.length}/${contextFiles.length} files to fit context window`));
+    }
+
     let enhancedPrompt = '';
-    
+
     // Add context header
     enhancedPrompt += `## Project Context\n\n`;
-    
-    for (const file of contextFiles) {
+
+    for (const file of includedFiles) {
       enhancedPrompt += `### From ${file.name}:\n${file.content}\n\n`;
     }
-    
+
     // Add the original prompt
     enhancedPrompt += `## User Request\n\n${promptText}\n\n`;
-    
+
     // Add instructions for the AI
     enhancedPrompt += `## Instructions\n\n`;
     enhancedPrompt += `- Consider the project context above\n`;
     enhancedPrompt += `- Follow any patterns or conventions mentioned\n`;
     enhancedPrompt += `- If tests are mentioned in context, include them\n`;
     enhancedPrompt += `- Respect any constraints from the context files\n`;
-    
+
     return enhancedPrompt;
   }
 
@@ -342,6 +409,14 @@ export class PromptGuard {
   private truncateContent(content: string, maxLength: number): string {
     if (content.length <= maxLength) return content;
     return content.substring(0, maxLength) + '\n... (truncated)';
+  }
+
+  /**
+   * Estimate token count (rough approximation: ~4 chars per token)
+   */
+  private estimateTokens(text: string): number {
+    // Rough estimate: 1 token ≈ 4 characters for English text
+    return Math.ceil(text.length / 4);
   }
 
   private getProjectTemplate(): string {
