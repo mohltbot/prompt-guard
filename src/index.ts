@@ -38,17 +38,22 @@ export class PromptGuard {
 
   /**
    * Load context from .md files in project root
+   * Filters out local environment specifics to prevent overfitting
    */
   async loadContext(projectPath: string = process.cwd()): Promise<ContextFile[]> {
     const contextFiles: ContextFile[] = [];
-    
+
     for (const fileName of this.config.contextFiles) {
       const filePath = path.join(projectPath, fileName);
-      
+
       if (fs.existsSync(filePath)) {
-        const content = fs.readFileSync(filePath, 'utf-8');
+        let content = fs.readFileSync(filePath, 'utf-8');
+
+        // Sanitize content to remove local environment specifics
+        content = this.sanitizeLocalEnv(content);
+
         this.contextCache.set(fileName, content);
-        
+
         contextFiles.push({
           name: fileName,
           content: this.truncateContent(content, 2000),
@@ -56,8 +61,43 @@ export class PromptGuard {
         });
       }
     }
-    
+
     return contextFiles;
+  }
+
+  /**
+   * Remove local environment specifics that cause overfitting
+   */
+  private sanitizeLocalEnv(content: string): string {
+    // Remove absolute paths
+    content = content.replace(/\/Users\/\w+|\/home\/\w+|C:\\Users\\\w+/g, '<USER_HOME>');
+
+    // Remove local ports (keep common ones like 3000, 8080 as examples)
+    content = content.replace(/localhost:\d{4,5}/g, (match) => {
+      const port = parseInt(match.split(':')[1]);
+      // Keep common ports as examples, redact others
+      if ([3000, 3001, 8080, 8000].includes(port)) {
+        return match;
+      }
+      return 'localhost:<PORT>';
+    });
+
+    // Remove API keys and tokens
+    content = content.replace(/(api[_-]?key|token|secret|password)\s*[:=]\s*['"\w-]+/gi, '$1: <REDACTED>');
+
+    // Remove local file paths but keep relative ones
+    content = content.replace(/\/\w+\/\w+\/[^\s]+\.(js|ts|json|md)/g, (match) => {
+      // Keep relative paths (starting with ./ or ../ or src/)
+      if (match.startsWith('./') || match.startsWith('../') || match.startsWith('src/')) {
+        return match;
+      }
+      return '<LOCAL_PATH>';
+    });
+
+    // Remove machine-specific config
+    content = content.replace(/(hostname|computer name|machine|device):\s*\w+/gi, '$1: <MACHINE>');
+
+    return content;
   }
 
   /**
@@ -101,7 +141,17 @@ export class PromptGuard {
         suggestion: 'Consider adding "don\'t break existing API" or "keep under 100 lines"'
       });
     }
-    
+
+    // Check 5: Local environment references (overfitting risk)
+    const localEnvIssues = this.checkLocalEnvReferences(promptText);
+    if (localEnvIssues.length > 0) {
+      results.push({
+        type: 'warning',
+        message: 'Prompt contains local environment references',
+        suggestion: `Remove: ${localEnvIssues.join(', ')}. Use relative paths and generic config instead.`
+      });
+    }
+
     return results;
   }
 
@@ -250,6 +300,32 @@ export class PromptGuard {
       /\bwithout\s+breaking\b/i
     ];
     return constraintPatterns.some(pattern => pattern.test(prompt));
+  }
+
+  private checkLocalEnvReferences(prompt: string): string[] {
+    const issues: string[] = [];
+
+    // Check for absolute paths
+    if (/\/Users\/\w+|\/home\/\w+|C:\\Users\\\w+/.test(prompt)) {
+      issues.push('absolute paths (/Users/..., /home/...)');
+    }
+
+    // Check for local ports
+    if (/localhost:\d{4,5}/.test(prompt)) {
+      issues.push('localhost ports');
+    }
+
+    // Check for machine-specific terms
+    if (/\b(my mac|my laptop|my machine|my computer)\b/i.test(prompt)) {
+      issues.push('machine-specific references');
+    }
+
+    // Check for local file paths that aren't relative
+    if (/\/[a-z]+\/[a-z]+\/[^\s]+\.(js|ts|json)/i.test(prompt)) {
+      issues.push('absolute file paths');
+    }
+
+    return issues;
   }
 
   private calculateRelevance(fileName: string): number {
