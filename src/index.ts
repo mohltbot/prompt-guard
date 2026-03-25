@@ -229,14 +229,18 @@ export class PromptGuard {
       }
     }
 
-    if (includedFiles.length < contextFiles.length) {
+    if (includedFiles.length < contextFiles.length && includedFiles.length > 0) {
       console.log(chalk.yellow(`⚠ Context truncated: using ${includedFiles.length}/${contextFiles.length} files to fit context window`));
+    } else if (includedFiles.length === 0 && contextFiles.length > 0) {
+      console.log(chalk.yellow(`⚠ Context window too small: no context files included. Increase maxContextTokens or shorten prompt.`));
     }
 
     let enhancedPrompt = '';
 
-    // Add context header
-    enhancedPrompt += `## Project Context\n\n`;
+    // Add context header only if we have context
+    if (includedFiles.length > 0) {
+      enhancedPrompt += `## Project Context\n\n`;
+    }
 
     for (const file of includedFiles) {
       enhancedPrompt += `### From ${file.name}:\n${file.content}\n\n`;
@@ -247,10 +251,15 @@ export class PromptGuard {
 
     // Add instructions for the AI
     enhancedPrompt += `## Instructions\n\n`;
-    enhancedPrompt += `- Consider the project context above\n`;
-    enhancedPrompt += `- Follow any patterns or conventions mentioned\n`;
-    enhancedPrompt += `- If tests are mentioned in context, include them\n`;
-    enhancedPrompt += `- Respect any constraints from the context files\n`;
+    if (includedFiles.length > 0) {
+      enhancedPrompt += `- Consider the project context above\n`;
+      enhancedPrompt += `- Follow any patterns or conventions mentioned\n`;
+      enhancedPrompt += `- If tests are mentioned in context, include them\n`;
+      enhancedPrompt += `- Respect any constraints from the context files\n`;
+    } else {
+      enhancedPrompt += `- No project context available — ask for clarification if needed\n`;
+      enhancedPrompt += `- Follow general best practices\n`;
+    }
 
     return enhancedPrompt;
   }
