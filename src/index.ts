@@ -343,6 +343,68 @@ export class PromptGuard {
   }
 
   /**
+   * Show prompt and context statistics
+   */
+  async showStats(promptText?: string): Promise<void> {
+    const contextFiles = await this.loadContext();
+
+    console.log(chalk.bold('\nPrompt Guard Statistics\n'));
+
+    // Context files section
+    console.log(chalk.bold('Context Files:'));
+    if (contextFiles.length === 0) {
+      console.log(chalk.yellow('  No context files found. Run `prompt-guard init` to create them.'));
+    } else {
+      let totalContextChars = 0;
+      let totalContextTokens = 0;
+      for (const file of contextFiles) {
+        const chars = file.content.length;
+        const tokens = this.estimateTokens(file.content);
+        totalContextChars += chars;
+        totalContextTokens += tokens;
+        const bar = chalk.green('█'.repeat(Math.round(file.relevance * 10)));
+        console.log(`  ${chalk.cyan(file.name.padEnd(14))} ${bar} relevance: ${file.relevance.toFixed(1)}  ${chars} chars  ~${tokens} tokens`);
+      }
+      console.log(chalk.gray(`  Total: ${contextFiles.length} files, ${totalContextChars} chars, ~${totalContextTokens} tokens`));
+    }
+
+    // Token budget section
+    console.log('');
+    console.log(chalk.bold('Token Budget:'));
+    const limit = this.config.maxContextTokens;
+    const contextTokens = contextFiles.reduce((sum, f) => sum + this.estimateTokens(f.content), 0);
+
+    if (promptText) {
+      const promptTokens = this.estimateTokens(promptText);
+      const total = promptTokens + contextTokens;
+      const pct = Math.round((total / limit) * 100);
+      const barLen = 30;
+      const filled = Math.min(Math.round((total / limit) * barLen), barLen);
+      const barColor = pct >= 100 ? chalk.red : pct >= 80 ? chalk.yellow : chalk.green;
+      const bar = barColor('█'.repeat(filled)) + chalk.gray('░'.repeat(barLen - filled));
+      console.log(`  Prompt:    ~${promptTokens} tokens`);
+      console.log(`  Context:   ~${contextTokens} tokens`);
+      console.log(`  Total:     ~${total} / ${limit} tokens  [${bar}] ${pct}%`);
+      if (pct >= 100) console.log(chalk.red('  ✗ Exceeds context limit'));
+      else if (pct >= 80) console.log(chalk.yellow('  ⚠ Approaching context limit'));
+      else console.log(chalk.green('  ✓ Within context limit'));
+    } else {
+      const pct = Math.round((contextTokens / limit) * 100);
+      console.log(`  Context:   ~${contextTokens} tokens`);
+      console.log(`  Limit:     ${limit} tokens  (${pct}% used by context)`);
+      console.log(chalk.gray('  Tip: pass a prompt to see full token breakdown'));
+    }
+
+    // Checks section
+    console.log('');
+    console.log(chalk.bold('Enabled Checks:'));
+    for (const check of this.config.enabledChecks) {
+      console.log(`  ${chalk.green('✓')} ${check}`);
+    }
+    console.log('');
+  }
+
+  /**
    * Show current configuration
    */
   showConfig(): void {

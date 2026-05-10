@@ -4,53 +4,118 @@ const { PromptGuard } = require('../dist/index');
 
 async function main() {
   const args = process.argv.slice(2);
-  
+
   if (args.length === 0) {
-    console.log('Usage: prompt-guard <command> [options]');
-    console.log('');
-    console.log('Commands:');
-    console.log('  check <prompt>     Check a prompt for missing context');
-    console.log('  enhance <prompt>   Enhance prompt with context from .md files');
-    console.log('  relevance <prompt> Show context relevance scoring');
-    console.log('  config             Show current configuration');
-    console.log('  init               Initialize prompt-guard in current project');
-    console.log('');
-    console.log('Examples:');
-    console.log('  prompt-guard-cli check "refactor auth system"');
-    console.log('  prompt-guard-cli enhance "add user login" --agent claude');
+    printHelp();
     process.exit(0);
   }
 
   const [command, ...rest] = args;
-  const promptText = rest.join(' ');
-  
-  const guard = new PromptGuard();
-  
+
+  // Detect flags up front so commands can share parsing
+  const flags = {};
+  const positional = [];
+  for (let i = 0; i < rest.length; i++) {
+    const a = rest[i];
+    if (a === '--verbose' || a === '-v') flags.verbose = true;
+    else if (a === '--dry-run') flags.dryRun = true;
+    else if (a === '--source' && rest[i + 1]) { flags.source = rest[++i]; }
+    else if (a === '--db-path' && rest[i + 1]) { flags.dbPath = rest[++i]; }
+    else positional.push(a);
+  }
+  const promptText = positional.join(' ');
+
   switch (command) {
-    case 'check':
+    case 'check': {
+      const guard = new PromptGuard();
       const results = await guard.check(promptText);
       guard.displayResults(results);
       break;
-    case 'enhance':
+    }
+    case 'enhance': {
+      const guard = new PromptGuard();
       const enhanced = await guard.enhance(promptText);
       console.log(enhanced);
       break;
-    case 'relevance':
+    }
+    case 'relevance': {
+      const guard = new PromptGuard();
       const { SmartRelevance } = require('../dist/smart-relevance');
       const relevance = new SmartRelevance(guard);
       const report = await relevance.generateRelevanceReport(promptText);
       console.log(report);
       break;
-    case 'config':
+    }
+    case 'stats': {
+      const guard = new PromptGuard();
+      await guard.showStats(promptText || undefined);
+      break;
+    }
+    case 'config': {
+      const guard = new PromptGuard();
       guard.showConfig();
       break;
-    case 'init':
+    }
+    case 'init': {
+      const guard = new PromptGuard();
       await guard.init();
       break;
+    }
+    case 'ingest': {
+      const { runIngest } = require('../dist/commands/ingest');
+      await runIngest({
+        source: flags.source,
+        dryRun: flags.dryRun,
+        dbPath: flags.dbPath,
+        verbose: flags.verbose,
+      });
+      break;
+    }
+    case 'corpus': {
+      const sub = positional[0];
+      if (sub === 'stats') {
+        const { runStats } = require('../dist/commands/stats');
+        await runStats({ dbPath: flags.dbPath });
+      } else {
+        console.error(`Unknown corpus subcommand: ${sub}`);
+        console.error('Try: prompt-guard corpus stats');
+        process.exit(1);
+      }
+      break;
+    }
     default:
       console.error(`Unknown command: ${command}`);
+      printHelp();
       process.exit(1);
   }
 }
 
-main().catch(console.error);
+function printHelp() {
+  console.log('Usage: prompt-guard <command> [options]');
+  console.log('');
+  console.log('Prompt commands:');
+  console.log('  check <prompt>     Check a prompt for missing context');
+  console.log('  enhance <prompt>   Enhance prompt with context from .md files');
+  console.log('  relevance <prompt> Show context relevance scoring');
+  console.log('  stats [prompt]     Show prompt and context statistics');
+  console.log('  config             Show current configuration');
+  console.log('  init               Initialize prompt-guard in current project');
+  console.log('');
+  console.log('Corpus commands:');
+  console.log('  ingest [--source claude-code|cowork|all] [--verbose]');
+  console.log('                     Ingest existing JSONL corpora into ~/.prompt-guard/corpus.db');
+  console.log('  corpus stats       Inspect ingested corpus + sample-check hygiene filters');
+  console.log('');
+  console.log('Options:');
+  console.log('  --db-path <path>   Override DB path (default ~/.prompt-guard/corpus.db)');
+  console.log('  --verbose | -v     Print per-file progress');
+  console.log('');
+  console.log('Examples:');
+  console.log('  prompt-guard ingest --source all');
+  console.log('  prompt-guard corpus stats');
+}
+
+main().catch(err => {
+  console.error(err);
+  process.exit(1);
+});
