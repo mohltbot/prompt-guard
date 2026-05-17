@@ -23,7 +23,7 @@ import shapeCoveragePrompts from '../eval/shape-coverage-prompts.json';
 import type { ClarifyingQuestion, ClarificationKind } from '../checks/types';
 
 export interface EvalOptions {
-  mode: 'gold' | 'shape-coverage';
+  mode: 'gold' | 'shape-coverage' | 'wide';
   dbPath?: string;
   budgetUsd?: number;       // hard cap on spend
   notesSuffix?: string;
@@ -70,6 +70,38 @@ function loadGoldCases(db: import('better-sqlite3').Database): GoldRow[] {
     WHERE cp.extraction_method = 'manual'
       AND p.name != 'prompt-guard'
       AND (p.cwd IS NULL OR p.cwd NOT LIKE '%prompt-guard%')
+    ORDER BY cp.pair_id
+  `).all() as GoldRow[];
+}
+
+/**
+ * Wide-eval cases: LLM-extracted clarifying pairs that DON'T already have a manual gold label.
+ * Used as confirmation that gold-baseline metrics hold off the hand-labeled subset.
+ * Scores against LLM's own clarification (not the developer's manual label) — measures
+ * consistency with the LLM extractor's judgment, not absolute correctness.
+ */
+function loadWideCases(db: import('better-sqlite3').Database): GoldRow[] {
+  return db.prepare(`
+    SELECT cp.pair_id, cp.originating_prompt_id, cp.clarification_kind, cp.clarification_text,
+           orig.content AS orig_content, orig.project_id AS orig_project_id
+    FROM clarifying_pairs cp
+    JOIN prompts orig ON orig.prompt_id = cp.originating_prompt_id
+    JOIN projects p ON p.project_id = orig.project_id
+    WHERE cp.extraction_method = 'llm'
+      AND p.name != 'prompt-guard'
+      AND (p.cwd IS NULL OR p.cwd NOT LIKE '%prompt-guard%')
+      AND NOT EXISTS (
+        SELECT 1 FROM clarifying_pairs cp_man
+        JOIN prompts m_orig ON m_orig.prompt_id = cp_man.originating_prompt_id
+        JOIN prompts m_clar ON m_clar.prompt_id = cp_man.clarifying_prompt_id
+        JOIN prompts c_orig ON c_orig.prompt_id = cp.originating_prompt_id
+        JOIN prompts c_clar ON c_clar.prompt_id = cp.clarifying_prompt_id
+        WHERE cp_man.extraction_method = 'manual'
+          AND cp_man.session_id = cp.session_id
+          AND COALESCE(m_orig.normalized_content, '') = COALESCE(c_orig.normalized_content, '')
+          AND COALESCE(m_clar.normalized_content, '') = COALESCE(c_clar.normalized_content, '')
+      )
+    GROUP BY cp.originating_prompt_id, cp.clarifying_prompt_id
     ORDER BY cp.pair_id
   `).all() as GoldRow[];
 }
@@ -186,11 +218,11 @@ export async function runEval(opts: EvalOptions): Promise<void> {
   const cases: RunCase[] = [];
   let totalCost = 0;
 
-  if (opts.mode === 'gold') {
-    const golds = loadGoldCases(db);
-    console.log(`Processing ${golds.length} gold pairs...`);
-    for (let i = 0; i < golds.length; i++) {
-      const g = golds[i];
+  if (opts.mode === 'gold' || opts.mode === 'wide') {
+    const cases_to_run = opts.mode === 'gold' ? loadGoldCases(db) : loadWideCases(db);
+    console.log(`Processing ${cases_to_run.length} ${opts.mode} pairs...`);
+    for (let i = 0; i < cases_to_run.length; i++) {
+      const g = cases_to_run[i];
       const gold: GoldClarification = {
         pairId: g.pair_id,
         originatingPromptId: g.originating_prompt_id,
@@ -202,7 +234,7 @@ export async function runEval(opts: EvalOptions): Promise<void> {
         const fullCase: RunCase = { goldPairId: g.pair_id, ...c };
         cases.push(fullCase);
         totalCost += c.costUsd;
-        process.stdout.write(`\r  [${i + 1}/${golds.length}] $${totalCost.toFixed(3)} spent · last latency ${c.latencyMs}ms     `);
+        process.stdout.write(`\r  [${i + 1}/${cases_to_run.length}] $${totalCost.toFixed(3)} spent · last latency ${c.latencyMs}ms     `);
         if (totalCost > budgetUsd) {
           console.log(`\n  ${chalk.red('Budget exceeded — stopping')}`);
           break;

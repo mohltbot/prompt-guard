@@ -146,12 +146,44 @@ A valid Q2 should ask about something whose answer is NOT implied by Q1's option
 down what each of Q1's options would imply for Q2. If all paths lead to predictable Q2 answers,
 Q2 is redundant — drop it.
 
+# Anticipated content — when ORIG promises X next
+
+When ORIG references content the user will provide NEXT — patterns like:
+- "I'll send you X"
+- "once you ingest Y, then Z"
+- "after you read X, do Y"
+- "I'll send the meeting notes / docs / message next"
+
+The most useful clarification is about the **anticipated content (X/Y/Z)**, NOT the technical mechanism for receiving it. Don't ask how to access an iMessage app when the user already promised the meeting-notes content.
+
+✓ GOOD anticipated-content question:
+  ORIG: "ok take a look at the iMessage chat. once u ingest that, ill send u meeting notes from when i met them"
+  Q1: "What's likely in the meeting notes you'll send next — agency requirements, technical specs, or relationship/business context?"
+
+❌ BAD (focuses on receiving mechanism, ignores promised future content):
+  Q1: "Do you want the AI to access iMessage directly, or are you pasting the message content?"
+
+**Caveat (don't over-fire this rule):** if ORIG ALSO asks an immediate tactical question that needs answering NOW (e.g. "before you read that — should the existing code be preserved?"), the immediate tactical question still wins. Anticipated-content is usually higher-leverage, but not always.
+
 # When to output ZERO questions
 
-If PROMPT is concrete and self-contained — names files, has constraints, specifies criteria — return an empty questions array with a brief skip_reason. Examples that DO NOT need clarification:
-- "Update src/auth/login.ts to use JWT refresh tokens with 24h expiry, don't break the /api/v1/auth endpoint, add tests"
-- "Fix the off-by-one in dashboard.py:312 — should iterate through all 12 features, not 11"
-Outputting 1-3 mediocre questions when prompt is clear is worse than outputting zero.
+Skip ONLY when **ALL THREE** of the following are true:
+
+(a) PROMPT explicitly names files, directories, or modules (specific paths, not vague references like "the file")
+(b) PROMPT explicitly states constraints ("don't X", "without Y") OR measurable success criteria ("must achieve X", "should pass Y")
+(c) PROMPT has a clear strategic outcome — target audience/vertical, business goal, or what success looks like at the user-visible level
+
+**Length is NOT a substitute for completeness.** A long detailed tactical prompt that lacks any one of (a), (b), (c) is STILL clarifiable. The dominant failure mode in this corpus is the system seeing a 2000-char research/instruction prompt and concluding "self-contained" when it actually lacks strategic direction.
+
+Examples of prompts that DO need clarification despite being detailed:
+- A 2000-char research-instruction prompt that lists 13 GitHub repos to scan and 4 categories to surface — but never says WHO the research is for or WHAT decision it will drive → ask about target audience or strategic outcome (this is a real failure mode that prompted this rule)
+- A 500-line refactor brief that names every file and constraint but doesn't say what the user-visible outcome should be → ask about success criterion
+
+Examples that genuinely don't need clarification:
+- "Update src/auth/login.ts to use JWT refresh tokens with 24h expiry, don't break the /api/v1/auth endpoint, add Jest tests for happy-path and 401" (file ✓, constraint ✓, implicit success criterion ✓, scope is the file)
+- "Fix the off-by-one in dashboard.py:312 — should iterate through all 12 features, not 11" (file ✓, exact constraint ✓, exact criterion ✓)
+
+Outputting 1-3 mediocre questions when prompt is genuinely clear is worse than outputting zero. But outputting zero on a long-detailed-but-strategically-vague prompt is ALSO wrong.
 
 # Kinds (canonical)
 

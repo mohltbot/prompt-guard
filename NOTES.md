@@ -140,6 +140,98 @@ session-ends-in-revert patterns, lower threshold to 0.3 or use a
 basename-Jaccard secondary signal. NOT now — current 0 is correct
 for current corpus.
 
+## MVP-4: kind-match floor is brittle to LLM kind-classification drift (2026-05-10)
+
+Two regressions in run_id=4 (post-patch gold re-run) were **pure kind-drift on
+boundary cases**, not content quality drops:
+
+- Pair 406: question content essentially unchanged; kind drifted `success-criteria` → `other`. Score dropped 0.500 → 0.065.
+- Pair 384: question structure preserved; kind drifted `success-criteria` → `domain-context`. Score dropped 0.500 → 0.116.
+
+Both questions live on category boundaries (e.g. "is this a success criterion or a domain-context question?") where the LLM's classification is inherently noisy. KIND_MATCH_FLOOR (currently 0.5) acts as a binary cliff at the kind boundary — get it right, score 0.5+; get it wrong, score = pure token overlap (~0.05-0.15).
+
+**Real signal:** the metric is part of what's being evaluated, not just the system.
+A baseline change to the system prompt can move kind labels without changing
+question utility. v0.5 refinement targets:
+
+1. **Lower the floor** (try 0.3 instead of 0.5) — more graduated, less binary
+2. **Semantic similarity instead of jaccard** — embedding-based overlap is less sensitive to kind boundaries
+3. **Kind-set match instead of exact match** — give partial credit for adjacent kinds (e.g. success-criteria ↔ other = 0.7, success-criteria ↔ ui-detail = 0)
+
+Don't fix now. Track as v0.5 metric refinement target after MVP-4 ships.
+
+## MVP-4 process lesson: don't block headline gains for narrow-slice metrics (2026-05-11)
+
+After v4 patches improved overlap@3 from 0.21 → 0.28 (+33%) but reduced verb-disam capture from 6/21 to 3/21, I (Claude) initially pushed for a tune (v3.1) to restore verb-disam capture. Mohammed correctly pushed back:
+
+> "0.280 vs 0.235 is meaningful (19% headline metric), and the verb-disam 'regression' is measured on a 21-case slice that's noisy relative to the 38-case overall. Trading 19% of the integrated signal to recover count on one slice is a bad trade."
+
+**Lesson logged:** don't block headline-metric improvements to preserve narrow slice metrics, especially when slice n is small. The eval harness aggregates for a reason. The kind-match-floor + jaccard scoring rewards strategic-axis reallocation (which v4 produced) over verb-disam pattern matching.
+
+When tempted to "fix" a slice regression that came alongside a meaningful headline gain:
+1. Check slice n. If n < 30, the slice is statistically noisy.
+2. Check whether the slice loss is content quality or measurement artifact.
+3. Compare slice loss × slice_n vs aggregate gain × case_n. If the trade is positive on weighted aggregate, ship.
+4. If still unsure, log the slice as a v0.5 target and let real-world use surface whether the slice loss matters.
+
+## MVP-4 wide-eval pool was zero after content-dedupe (2026-05-11)
+
+When implementing `--mode wide` for confirmation eval, the query for "LLM-extracted pairs that don't have a content-equivalent manual gold label" returned **zero cases**. After in-session content-dedupe (the v0 fix for replay artifacts), every LLM-accepted pair maps 1:1 to a manual gold label.
+
+**This is structurally informative, not a bug:**
+- the developer's 90-min hand-labeling covered the full extractor-accepted space after dedupe
+- LLM extractor filtering was well-calibrated to his judgment
+- The "gold subset ⊂ wide pool" framing from the original design doesn't apply to this corpus
+
+**Implication:** the 38-case gold eval IS the full eval. The 0.283 overlap@3 baseline is the population number for v0, not a sample. Wide-eval confirmation as originally scoped is moot until corpus grows beyond the hand-labeled set (real-world forward-going `prompt-guard accept` captures or design-partner data).
+
+**v0.5 implication:** when corpus grows past hand-labeled, wide eval will become meaningful again. Re-enable then.
+
+## v0.5 prompt-engineering targets (post-MVP-4)
+
+1. **Verb-disam recovery without overlap@3 regression** — v3.1 attempt showed it's harder than expected. Likely needs careful study of when verb-disam should override anticipated-content vs when both should fire.
+2. **Kind-match floor brittleness** — pair 406, 384 pattern shows kind classification drift on boundary cases costs 0.4 score per case. Consider: lower floor to 0.3, semantic similarity, or kind-set match.
+3. **Inherent-ceiling cases** — pair 389 pattern. Document the fraction in baseline reports so expectations are right-sized.
+
+## MVP-4 v3.1 re-run expectations (2026-05-11)
+
+Tune scope: option (b) — verb-disambiguation and anticipated-content framed as
+orthogonal axes, both fire when both signals present.
+
+Success criteria for the re-run:
+- **Verb-disam capture ≥ 6/21** (return to baseline or better). If still 3/21, the fix didn't work — pause.
+- **Mean overlap@3 ≥ 0.28** (don't lose the +33% patched gain)
+- **No NEW regressions** beyond the kind-drift on 406/384 (which we're accepting as metric artifact)
+
+If all three hold → wide eval as confirmation. If any degrades → pause and re-diagnose.
+
+## MVP-4 baseline diagnostic: inherent-ceiling cases (2026-05-10)
+
+A subset of gold pairs have clarifications the system cannot predict from ORIG alone — gold captures STRATEGIC INTENT that wasn't in the prompt at all. **Pair 389** is the canonical example:
+- ORIG: 3 URLs (`https://demosaas.com/` + 2 tweets)
+- GOLD clarification: *"goal is to show up to the meeting with automations already built, backed by extensive research — not just a plan"*
+- The strategic intent only exists in filtered-out session-resume preambles (id=10988)
+- 3 URLs produce no usable BM25 tokens
+
+These cases set a soft ceiling on overlap@3 around 0.30-0.40 for jaccard-based scoring. Expected rate in the developer's corpus: ~5-10% of gold pairs.
+
+**Handling rule:**
+- Tag inherent-ceiling cases at eval time so they can be excluded from headline metrics OR scored separately
+- v0.5: add `inherent_ceiling` boolean to `eval_cases`; detection heuristic = (ORIG length < 100 chars OR ORIG is URL-only) AND (retrieval returns 0-2 results)
+- Track over time: as corpus grows, fewer cases stay inherent-ceiling (more retrieval signal accumulates)
+
+## Domain-context taxonomy addition has empirical ROI (2026-05-10)
+
+The `domain-context` kind was added as a v0.5 taxonomy expansion after hand-labeling surfaced 8 pairs in `other` that clustered around external grounding (meeting notes, deployment infra, research sources, example clients).
+
+**Empirical result on MVP-4 baseline (run_id=1, n=38 gold):**
+- domain-context overlap@3: **0.375** (highest of all kinds)
+- vs. file-scope: 0.147
+- vs. success-criteria: 0.207
+- vs. constraint: 0.107 (n=2, single-digit slice)
+
+**This is direct evidence** that the labeling pass had ROI: the new kind discovered from hand-labeling outscored every pre-existing kind by 47-260%. Cite when presenting the methodology.
+
 ## Taxonomy expansion: domain-context kind (2026-05-10)
 
 The 6-kind taxonomy (file-scope / success-criteria / constraint / data-shape /
