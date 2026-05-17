@@ -130,6 +130,37 @@ session-ends-in-revert patterns, lower threshold to 0.3 or use a
 basename-Jaccard secondary signal. NOT now — current 0 is correct
 for current corpus.
 
+## Taxonomy expansion: domain-context kind (2026-05-10)
+
+The 6-kind taxonomy (file-scope / success-criteria / constraint / data-shape /
+ui-detail / other) leaked ~25% of LLM-accepted pairs into the catch-all "other"
+bucket. the developer's 9 → 8 (post-dedupe) `other` labels in the gold subset
+clustered around a coherent missing concept: **external grounding**.
+
+**New kind: `domain-context`.** Definition: CLAR delivers external context
+that grounds the AI in resources, sources, examples, infrastructure choices,
+or business background ORIG referenced but did not include. Distinguishes
+from `file-scope` by being EXTERNAL (research sources, deployment targets,
+customer info) vs internal codebase paths.
+
+**Migrated (broad interpretation, 2026-05-10):** all 8 `other` labels in
+gold subset reclassified to `domain-context`. New distribution:
+- file-scope: 14
+- success-criteria: 13
+- domain-context: 8  ← new slice, 21% of gold
+- constraint: 2
+- rejected: 1
+
+**LLM extractor v1.1 (system prompt + tool schema):**
+- Added `domain-context` to the `submit_verdict` tool's `kind` enum
+- Added explicit kind definition + 5 example sub-patterns in the system prompt
+- Updated disambiguation priority order: file-scope > domain-context > constraint > success-criteria > data-shape > ui-detail > other
+- Result: future LLM calls can now output `domain-context` directly; should reduce `other` usage to near-zero
+
+**Validation deferred:** A/B test against gold subset comes with MVP-3 first
+question-gen pass. Same Sonnet 4.6 + system-prompt style validates both
+extractor-v1.1 and question-gen prompt simultaneously.
+
 ## LLM extractor v1 system-prompt tuning (2026-05-10)
 
 After the developer's 38-pair hand-label session, kind-override rate was 73% (27 of

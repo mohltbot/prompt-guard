@@ -24,6 +24,7 @@ export type ClarificationKind =
   | 'constraint'
   | 'data-shape'
   | 'ui-detail'
+  | 'domain-context'
   | 'other';
 
 export interface ClarifyingQuestion {

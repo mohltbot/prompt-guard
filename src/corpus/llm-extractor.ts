@@ -17,6 +17,7 @@ export type ClarificationKind =
   | 'constraint'
   | 'data-shape'
   | 'ui-detail'
+  | 'domain-context'
   | 'other';
 
 export interface ExtractorInput {
@@ -96,20 +97,31 @@ If ANY of these is false, the pair is a false positive — return is_real_clarif
 
 - **ui-detail**: CLAR specifies visual/interaction specifics — color, spacing, font, alignment, layout, hover, click.
 
-- **other**: Real clarification but doesn't fit the categories above.
-  TYPICAL "other": meeting-note delivery, business/domain context, research-source direction,
-  example-subject choice ("use Globex-Sports as the target client"). If you find yourself reaching
-  for "other" but CLAR names specific files → use file-scope instead.
+- **domain-context**: CLAR delivers external context that grounds the AI in resources, sources,
+  examples, infrastructure choices, or business background ORIG referenced but did not include.
+  TYPICAL "domain-context":
+  - Meeting notes / in-person session recaps delivering customer requirements
+  - Research-source direction ("look at HN and founder blogs, not Reddit")
+  - Example-subject choice ("use Globex Sports as the target client")
+  - Deployment/storage target ("publish to DigitalOcean droplet", "GDrive folder")
+  - Business/domain background about a customer or vertical
+  Differs from file-scope: file-scope names files IN THE CODEBASE; domain-context
+  references EXTERNAL resources, places, or business facts.
+
+- **other**: Real clarification but doesn't fit any of the categories above.
+  Should be rare. If you find yourself reaching for "other": ask whether CLAR is really
+  domain-context (external grounding) or file-scope (specific files) and pick one of those.
 
 # Disambiguation priority when multiple kinds could apply
 
 Apply in this order:
-1. If CLAR names specific files/dirs/paths → file-scope (even if CLAR also adds context/criteria)
-2. If CLAR has explicit negative phrasing ("don't X") → constraint
-3. If CLAR has explicit positive measurable criterion ("must achieve X") → success-criteria
-4. If CLAR specifies a type/schema → data-shape
-5. If CLAR specifies UI/interaction visuals → ui-detail
-6. Real clarification but none of the above → other
+1. If CLAR names specific files/dirs/paths IN THE CODEBASE → file-scope (even if CLAR also adds context/criteria)
+2. If CLAR delivers EXTERNAL context (meeting notes, research sources, example targets, deployment infra, business background) → domain-context
+3. If CLAR has explicit negative phrasing ("don't X") → constraint
+4. If CLAR has explicit positive measurable criterion ("must achieve X") → success-criteria
+5. If CLAR specifies a type/schema → data-shape
+6. If CLAR specifies UI/interaction visuals → ui-detail
+7. Real clarification but none of the above → other (should be rare)
 
 If the rule extractor's kind is wrong but the pair IS a real clarification, refine the kind. The user wants strict agreement, so an honest kind correction is better than rubber-stamping.
 
@@ -201,7 +213,7 @@ const VERDICT_TOOL: Anthropic.Tool = {
       },
       kind: {
         type: 'string',
-        enum: ['file-scope', 'success-criteria', 'constraint', 'data-shape', 'ui-detail', 'other'],
+        enum: ['file-scope', 'success-criteria', 'constraint', 'data-shape', 'ui-detail', 'domain-context', 'other'],
         description: 'Required if is_real_clarification is true. Refine if the rule extractor mistagged.',
       },
       refined_text: {
