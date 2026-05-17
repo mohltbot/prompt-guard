@@ -194,7 +194,7 @@ export async function runLabelLlm(opts: LabelLlmOptions = {}): Promise<void> {
   const onComplete = (pair: PairRow, verdict: LlmVerdict): void => {
     completed += 1;
     totalLatency += verdict.latencyMs;
-    totalCost += estimateCost(verdict);
+    totalCost += estimateCost(verdict);  // estimateCost itself is now fixed in llm-extractor.ts
 
     const isApiErr =
       verdict.reason.startsWith('LLM API error') || verdict.reason.startsWith('LLM did not');

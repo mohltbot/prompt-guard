@@ -32,6 +32,7 @@ export interface RetrieveOptions {
   limit?: number;            // default 12
   globalFallback?: boolean;  // default true — falls back to global if project has < limit/2 matches
   excludeSyntheticPrompts?: boolean;  // default true — skip prompts that look like harness output
+  excludePromptIds?: number[];        // skip these prompt IDs (eval uses this to prevent leakage)
 }
 
 const SELF_REF_NAME = 'prompt-guard';

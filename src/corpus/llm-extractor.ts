@@ -348,8 +348,10 @@ const SONNET_OUTPUT_PER_MTOK = 15.0;
 const CACHED_INPUT_DISCOUNT = 0.1;       // cached reads cost 10% of normal
 
 export function estimateCost(verdict: LlmVerdict): number {
+  // Per Anthropic API: input_tokens is the FRESH count (already excludes cached).
+  // cache_read_input_tokens is the SEPARATE cached count, billed at 10% of input rate.
+  const fresh = verdict.inputTokens || 0;
   const cached = verdict.cachedInputTokens || 0;
-  const fresh = (verdict.inputTokens || 0) - cached;
   const out = verdict.outputTokens || 0;
   return (
     (fresh / 1_000_000) * SONNET_INPUT_PER_MTOK +

@@ -27,6 +27,8 @@ async function main() {
     else if (a === '--concurrency' && rest[i + 1]) { flags.concurrency = rest[++i]; }
     else if (a === '--retry-missing') { flags.retryMissing = true; }
     else if (a === '--preview') { flags.preview = true; }
+    else if (a === '--mode' && rest[i + 1]) { flags.mode = rest[++i]; }
+    else if (a === '--budget' && rest[i + 1]) { flags.budget = rest[++i]; }
     else positional.push(a);
   }
   const promptText = positional.join(' ');
@@ -124,6 +126,15 @@ async function main() {
     case 'learn': {
       const { runLearn } = require('../dist/commands/learn');
       await runLearn({ prompt: promptText, dbPath: flags.dbPath });
+      break;
+    }
+    case 'eval': {
+      const { runEval } = require('../dist/commands/eval');
+      await runEval({
+        mode: flags.mode || 'gold',
+        dbPath: flags.dbPath,
+        budgetUsd: flags.budget ? parseFloat(flags.budget) : 2.0,
+      });
       break;
     }
     default:

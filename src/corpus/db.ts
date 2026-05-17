@@ -40,6 +40,15 @@ export function openDb(opts: OpenOptions = {}): Database.Database {
     // Post-create column adds for existing DBs.
     // SQLite throws if column exists; we ignore that specific error.
     try { db.exec(`ALTER TABLE clarifying_pairs ADD COLUMN reason TEXT`); } catch (e) { /* already exists */ }
+    // MVP-4 eval instrumentation columns
+    try { db.exec(`ALTER TABLE eval_cases ADD COLUMN vague_verb INTEGER`); } catch (e) { /* */ }
+    try { db.exec(`ALTER TABLE eval_cases ADD COLUMN has_verb_disambiguation_q INTEGER`); } catch (e) { /* */ }
+    try { db.exec(`ALTER TABLE eval_cases ADD COLUMN has_live_vs_local_q2 INTEGER`); } catch (e) { /* */ }
+    try { db.exec(`ALTER TABLE eval_cases ADD COLUMN correct_skip INTEGER`); } catch (e) { /* */ }
+    try { db.exec(`ALTER TABLE eval_cases ADD COLUMN gold_pair_id INTEGER`); } catch (e) { /* */ }
+    try { db.exec(`ALTER TABLE eval_cases ADD COLUMN shape TEXT`); } catch (e) { /* */ }
+    try { db.exec(`ALTER TABLE eval_runs ADD COLUMN mode TEXT`); } catch (e) { /* */ }
+    try { db.exec(`ALTER TABLE eval_cases ADD COLUMN synthetic_prompt TEXT`); } catch (e) { /* */ }
 
     // Record migration version
     const existing = db

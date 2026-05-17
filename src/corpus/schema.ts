@@ -245,7 +245,9 @@ CREATE INDEX IF NOT EXISTS idx_failed_status ON failed_extraction_pairs(error_st
 CREATE TABLE IF NOT EXISTS eval_cases (
     eval_case_id            INTEGER PRIMARY KEY AUTOINCREMENT,
     run_id                  INTEGER NOT NULL REFERENCES eval_runs(run_id),
-    originating_prompt_id   INTEGER NOT NULL REFERENCES prompts(prompt_id),
+    -- originating_prompt_id is nullable (shape-coverage cases use synthetic prompts
+    -- not in the corpus). FK dropped at v0.5 schema migration.
+    originating_prompt_id   INTEGER,
     proposed_questions_json TEXT NOT NULL,
     gold_clarifications_json TEXT NOT NULL,
     overlap_at_1            REAL,
@@ -254,7 +256,15 @@ CREATE TABLE IF NOT EXISTS eval_cases (
     retrieved_session_ids   TEXT,
     latency_ms              INTEGER,
     cost_usd                REAL,
-    is_in_gold_subset       INTEGER NOT NULL DEFAULT 0
+    is_in_gold_subset       INTEGER NOT NULL DEFAULT 0,
+    -- instrumentation columns (added via ALTER for existing DBs in db.ts)
+    vague_verb              INTEGER,
+    has_verb_disambiguation_q INTEGER,
+    has_live_vs_local_q2    INTEGER,
+    correct_skip            INTEGER,
+    gold_pair_id            INTEGER,
+    shape                   TEXT,
+    synthetic_prompt        TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_eval_cases_run ON eval_cases(run_id);
 CREATE INDEX IF NOT EXISTS idx_eval_cases_gold ON eval_cases(is_in_gold_subset);

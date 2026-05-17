@@ -1,0 +1,37 @@
+{
+  "_notes": [
+    "Vague-verb regex catches verbs that historically led to clarification debt.",
+    "Add new patterns here as eval surfaces missed prompts. No code change required.",
+    "Patterns are case-insensitive; tested via `new RegExp(regex, 'i').test(prompt)`."
+  ],
+  "vagueVerbs": {
+    "examples": [
+      "set up X",
+      "fix X",
+      "improve X / make X better / make X look better",
+      "handle X",
+      "build the new X / build it",
+      "do that / do them all / do it",
+      "look at X / audit X",
+      "make it work"
+    ],
+    "regex": "\\b(?:set\\s+up|fix(?:\\s+the)?|improve|handle|build(?:\\s+the)?|audit|look\\s+(?:at|better)|make\\s+(?:it\\s+)?(?:better|look\\s+(?:better|good)?|work)|do\\s+(?:that|them|it)(?:\\s+all)?)\\b"
+  },
+  "verbDisambiguationQuestion": {
+    "examples": [
+      "Does 'X' mean (a) ..., (b) ..., or (c) ...?",
+      "Are you asking to — write the logic, wire the scheduler, or add a UI trigger?",
+      "What does 'proper Y' mean — option A, option B, or option C?"
+    ],
+    "regexes": [
+      "\\([a-c]\\).+\\([a-c]\\).+\\([a-c]\\)",
+      "\\bdoes\\s+['\"]?\\w+['\"]?\\s+mean\\b",
+      "—\\s+(?:write|wire|add|deploy|create|set up|configure|catch|log|retry).+?,\\s+or\\s+"
+    ]
+  },
+  "liveVsLocalQuestion": {
+    "description": "Detects when Q2 asks about deployment location (live URL vs local file).",
+    "liveSignals": "https?://|\\blive\\b|\\bdeployed\\b|\\bproduction\\b|\\bdroplet\\b",
+    "localSignals": "\\blocal\\b|\\.py\\b|\\.ts\\b|\\.js\\b|src/|/sessions/|/mnt/"
+  }
+}

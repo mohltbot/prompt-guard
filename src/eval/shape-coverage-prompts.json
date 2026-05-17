@@ -1,0 +1,85 @@
+{
+  "_notes": "20 prompts spanning 4 shapes: should-skip (clear), cross-project, adversarial vague, DemoSaaS variants. Used for the shape-coverage eval supplement.",
+  "prompts": [
+    {
+      "shape": "should-skip",
+      "text": "Update src/auth/login.ts to use JWT refresh tokens with 24h expiry, don't break the /api/v1/auth endpoint, and add Jest tests for happy-path and 401 cases."
+    },
+    {
+      "shape": "should-skip",
+      "text": "Fix the off-by-one bug in dashboard.py line 312 — the loop should iterate through all 12 features, not 11."
+    },
+    {
+      "shape": "should-skip",
+      "text": "Create tests/test_seo_engine.py with 5 pytest cases for seo_content_engine.py: empty keyword, missing API key, valid keyword, network failure, malformed JSON response."
+    },
+    {
+      "shape": "should-skip",
+      "text": "Refactor wordpress_publisher.py to extract markdown→HTML conversion into a new module called markdown_to_wp_html.py. Don't change the public API of publish_article()."
+    },
+    {
+      "shape": "should-skip",
+      "text": "In ad_copy_generator.py, switch the LLM provider from anthropic to deepseek (OpenAI-compatible). Update env var to DEEPSEEK_API_KEY. Keep all generation logic, prompts, and output schemas unchanged."
+    },
+    {
+      "shape": "cross-project",
+      "text": "Add a dark-mode toggle to the ArchTrack admin dashboard"
+    },
+    {
+      "shape": "cross-project",
+      "text": "Fix the auth flow in the openclaw-debugger pipeline"
+    },
+    {
+      "shape": "cross-project",
+      "text": "Build a new daily summary widget for the mission-control project"
+    },
+    {
+      "shape": "cross-project",
+      "text": "Set up a cron job for the inbox-monitor task"
+    },
+    {
+      "shape": "cross-project",
+      "text": "Add error handling to the bensbites-implementation runner script"
+    },
+    {
+      "shape": "adversarial-vague",
+      "text": "do that thing we talked about"
+    },
+    {
+      "shape": "adversarial-vague",
+      "text": "make it work"
+    },
+    {
+      "shape": "adversarial-vague",
+      "text": "this is broken"
+    },
+    {
+      "shape": "adversarial-vague",
+      "text": "improve it"
+    },
+    {
+      "shape": "adversarial-vague",
+      "text": "you know what to do"
+    },
+    {
+      "shape": "demosaas-variant",
+      "text": "add a settings page to the dashboard"
+    },
+    {
+      "shape": "demosaas-variant",
+      "text": "improve the SEO output quality"
+    },
+    {
+      "shape": "demosaas-variant",
+      "text": "fix the campaign builder bug"
+    },
+    {
+      "shape": "demosaas-variant",
+      "text": "deploy the latest changes"
+    },
+    {
+      "shape": "demosaas-variant",
+      "text": "test the WordPress publisher"
+    }
+  ]
+}
